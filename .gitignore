@@ -1,0 +1,33 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Generated dynamic data files (keep db.json for seed, ignore dynamic uploads/screenshots)
+data/screenshots/*
+!data/screenshots/.gitkeep
+data/resumes/*
+!data/resumes/.gitkeep
+data/sessions/*
+!data/sessions/.gitkeep
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+*.tmp
+*.log
