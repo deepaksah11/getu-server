@@ -22,48 +22,15 @@ import { mockPlatformRouter } from './routes/mockPlatform.js';
 
 export const app = express();
 
-// The API can start logins with stored passwords, so only the app's own UI may call it from a browser
-const clientUrls = (env.CLIENT_URL || '')
-  .split(',')
-  .map((u) => u.trim().replace(/\/+$/, ''))
-  .filter(Boolean);
-
-const allowedOrigins = new Set([
-  ...clientUrls,
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:4173',
-  'http://127.0.0.1:4173',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-]);
-
-const isOriginAllowed = (origin?: string): boolean => {
-  if (!origin) return true; // non-browser requests, health checks, curl
-  const clean = origin.trim().replace(/\/+$/, '');
-  if (allowedOrigins.has('*') || allowedOrigins.has(clean)) return true;
-  // Automatically permit *.onrender.com, *.vercel.app, and *.netlify.app for smooth cloud hosting
-  if (clean.endsWith('.onrender.com') || clean.endsWith('.vercel.app') || clean.endsWith('.netlify.app')) {
-    return true;
-  }
-  return false;
-};
-
+// Enable CORS for all clients (including https://job.wegeti.com, localhost, Cloudflare, Vercel)
 app.use(
   cors({
-    origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
+    origin: true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'X-Requested-With', 'Accept'],
   })
 );
-
-app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
-  if (origin && !isOriginAllowed(origin)) {
-    res.status(403).json({ success: false, error: `Origin '${origin}' not allowed by CORS. Set CLIENT_URL on Render.` });
-    return;
-  }
-  next();
-});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
