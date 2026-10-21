@@ -38,8 +38,24 @@ export class SupabaseAdapter implements IRepository {
     });
   }
 
+  private toError(err: any): Error {
+    if (err instanceof Error) return err;
+    const msg = err?.message || err?.error_description || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+    const e = new Error(msg);
+    if (err?.code) (e as any).code = err.code;
+    return e;
+  }
+
   async init(): Promise<void> {
-    logger.info('Supabase client initialized');
+    try {
+      const { error } = await this.client.from('users').select('id').limit(1);
+      if (error) {
+        throw this.toError(error);
+      }
+      logger.info('Supabase client initialized and connected to database');
+    } catch (err: any) {
+      throw this.toError(err);
+    }
   }
 
   async getUser(userId: string): Promise<User | null> {
@@ -82,7 +98,7 @@ export class SupabaseAdapter implements IRepository {
       .upsert({ ...prefs, user_id: userId, updated_at: new Date().toISOString() })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -104,7 +120,7 @@ export class SupabaseAdapter implements IRepository {
       .upsert({ ...profile, user_id: userId, updated_at: new Date().toISOString() })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -133,7 +149,7 @@ export class SupabaseAdapter implements IRepository {
       })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -145,7 +161,7 @@ export class SupabaseAdapter implements IRepository {
       .order('created_at', { ascending: false });
     if (jobId) query = query.eq('job_id', jobId);
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
@@ -159,7 +175,7 @@ export class SupabaseAdapter implements IRepository {
     version: Omit<ResumeVersion, 'id' | 'created_at' | 'updated_at'>
   ): Promise<ResumeVersion> {
     const { data, error } = await this.client.from('resume_versions').insert(version).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -177,7 +193,7 @@ export class SupabaseAdapter implements IRepository {
     const limit = options?.limit || 50;
     query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
     const { data, count, error } = await query;
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return { jobs: data || [], total: count || 0 };
   }
 
@@ -206,7 +222,7 @@ export class SupabaseAdapter implements IRepository {
       .upsert(job, { onConflict: 'platform,external_id' })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -259,7 +275,7 @@ export class SupabaseAdapter implements IRepository {
 
   async getMatches(userId: string): Promise<JobMatch[]> {
     const { data, error } = await this.client.from('job_matches').select('*').eq('user_id', userId);
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
@@ -269,7 +285,7 @@ export class SupabaseAdapter implements IRepository {
       .upsert(match, { onConflict: 'user_id,job_id' })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -286,7 +302,7 @@ export class SupabaseAdapter implements IRepository {
     const limit = options?.limit || 50;
     query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
     const { data, count, error } = await query;
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return { applications: data || [], total: count || 0 };
   }
 
@@ -313,7 +329,7 @@ export class SupabaseAdapter implements IRepository {
 
   async createApplication(app: Omit<Application, 'id' | 'created_at' | 'updated_at'>): Promise<Application> {
     const { data, error } = await this.client.from('applications').insert(app).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -326,7 +342,7 @@ export class SupabaseAdapter implements IRepository {
       .eq('id', id)
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -335,31 +351,31 @@ export class SupabaseAdapter implements IRepository {
       .from('application_questions')
       .select('*, answer:application_answers(*)')
       .eq('application_id', applicationId);
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
   async saveQuestion(question: Omit<ApplicationQuestion, 'id' | 'created_at'>): Promise<ApplicationQuestion> {
     const { data, error } = await this.client.from('application_questions').insert(question).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
   async saveAnswer(answer: Omit<ApplicationAnswer, 'id' | 'created_at'>): Promise<ApplicationAnswer> {
     const { data, error } = await this.client.from('application_answers').insert(answer).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
   async createRun(run: Omit<AutomationRun, 'id' | 'started_at'>): Promise<AutomationRun> {
     const { data, error } = await this.client.from('automation_runs').insert(run).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
   async updateRun(id: string, updates: Partial<AutomationRun>): Promise<AutomationRun> {
     const { data, error } = await this.client.from('automation_runs').update(updates).eq('id', id).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -370,7 +386,7 @@ export class SupabaseAdapter implements IRepository {
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
       .limit(limit);
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
@@ -387,7 +403,7 @@ export class SupabaseAdapter implements IRepository {
 
   async addStep(step: Omit<AutomationStep, 'id' | 'created_at'>): Promise<AutomationStep> {
     const { data, error } = await this.client.from('automation_steps').insert(step).select().single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -396,13 +412,13 @@ export class SupabaseAdapter implements IRepository {
     if (runId) query = query.eq('run_id', runId);
     if (applicationId) query = query.eq('application_id', applicationId);
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
   async addError(error: Omit<AutomationError, 'id' | 'created_at'>): Promise<AutomationError> {
     const { data, error: err } = await this.client.from('automation_errors').insert(error).select().single();
-    if (err) throw err;
+    if (err) throw this.toError(err);
     return data;
   }
 
@@ -410,7 +426,7 @@ export class SupabaseAdapter implements IRepository {
     let query = this.client.from('automation_errors').select('*').order('created_at', { ascending: false }).limit(limit);
     if (runId) query = query.eq('run_id', runId);
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
@@ -524,13 +540,13 @@ export class SupabaseAdapter implements IRepository {
 
   async getAllPreferences(): Promise<UserPreferences[]> {
     const { data, error } = await this.client.from('user_preferences').select('*');
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
   async getCredentials(userId: string): Promise<PlatformCredential[]> {
     const { data, error } = await this.client.from('platform_credentials').select('*').eq('user_id', userId);
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
@@ -558,7 +574,7 @@ export class SupabaseAdapter implements IRepository {
       )
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -577,7 +593,7 @@ export class SupabaseAdapter implements IRepository {
       .select('*')
       .eq('user_id', userId)
       .order('times_seen', { ascending: false });
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data || [];
   }
 
@@ -602,7 +618,7 @@ export class SupabaseAdapter implements IRepository {
         .eq('id', existing.id)
         .select()
         .single();
-      if (error) throw error;
+      if (error) throw this.toError(error);
       return data;
     }
     const { data, error } = await this.client
@@ -610,7 +626,7 @@ export class SupabaseAdapter implements IRepository {
       .insert({ ...entry, times_seen: entry.times_seen ?? 1 })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw this.toError(error);
     return data;
   }
 
@@ -639,25 +655,38 @@ export class SupabaseAdapter implements IRepository {
   }
 
   async recoverInterrupted(): Promise<{ runs: number; applications: number }> {
-    const now = new Date().toISOString();
-    const { data: runs } = await this.client
-      .from('automation_runs')
-      .update({
-        status: 'failed',
-        ended_at: now,
-        error_message: 'Interrupted: the server stopped while this run was in progress.',
-      })
-      .eq('status', 'running')
-      .select('id');
-    const { data: apps } = await this.client
-      .from('applications')
-      .update({
-        status: 'FAILED',
-        failure_reason: 'Interrupted mid-run; it will be retried on the next run.',
-        updated_at: now,
-      })
-      .in('status', TRANSIENT_APPLICATION_STATUSES)
-      .select('id');
-    return { runs: runs?.length || 0, applications: apps?.length || 0 };
+    try {
+      const now = new Date().toISOString();
+      const { data: runs, error: runsErr } = await this.client
+        .from('automation_runs')
+        .update({
+          status: 'failed',
+          ended_at: now,
+          error_message: 'Interrupted: the server stopped while this run was in progress.',
+        })
+        .eq('status', 'running')
+        .select('id');
+      if (runsErr) {
+        logger.warn({ err: runsErr?.message || runsErr }, 'Failed updating interrupted runs');
+      }
+
+      const { data: apps, error: appsErr } = await this.client
+        .from('applications')
+        .update({
+          status: 'FAILED',
+          failure_reason: 'Interrupted mid-run; it will be retried on the next run.',
+          updated_at: now,
+        })
+        .in('status', TRANSIENT_APPLICATION_STATUSES)
+        .select('id');
+      if (appsErr) {
+        logger.warn({ err: appsErr?.message || appsErr }, 'Failed updating interrupted applications');
+      }
+
+      return { runs: runs?.length || 0, applications: apps?.length || 0 };
+    } catch (err: any) {
+      logger.warn({ err: err?.message || err }, 'Supabase recoverInterrupted failed');
+      return { runs: 0, applications: 0 };
+    }
   }
 }

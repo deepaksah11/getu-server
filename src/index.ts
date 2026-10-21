@@ -92,6 +92,60 @@ app.use('/api/answers', answersRouter);
 // Local practice board used for testing the automation end to end
 app.use('/mock-portal', mockPlatformRouter);
 
+app.get('/', (req: Request, res: Response) => {
+  if (req.accepts('html')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getu Server API</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; display: flex; justify-content: center; align-items: center; min-height: 80vh; margin: 0; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 2rem; max-width: 520px; width: 100%; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
+    .badge { display: inline-block; background: #065f46; color: #34d399; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
+    h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; color: #ffffff; }
+    p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin: 0 0 1.5rem 0; }
+    .links { display: flex; flex-direction: column; gap: 0.5rem; }
+    a { display: block; background: #334155; color: #38bdf8; padding: 0.75rem 1rem; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; }
+    a:hover { background: #475569; color: #ffffff; }
+    .note { margin-top: 1.5rem; font-size: 0.75rem; color: #64748b; border-top: 1px solid #334155; padding-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">● Online & Healthy</span>
+    <h1>🚀 Getu Server API</h1>
+    <p>The backend automation and live job search engine is running successfully on Render.</p>
+    <div class="links">
+      <a href="/health" target="_blank">🔍 Health Check Endpoint (/health)</a>
+      <a href="/api/jobs" target="_blank">💼 Live Jobs API (/api/jobs)</a>
+      <a href="/api/jobs/sources" target="_blank">🌐 Registered Portals & Sources (/api/jobs/sources)</a>
+    </div>
+    <div class="note">
+      Connect your frontend (<code>getu-client</code>) by setting <code>VITE_API_URL=https://getu-server.onrender.com</code>.
+    </div>
+  </div>
+</body>
+</html>`);
+    return;
+  }
+
+  res.json({
+    status: 'ok',
+    message: 'Getu Server API is running',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      jobs: '/api/jobs',
+      sources: '/api/jobs/sources',
+      export: '/api/jobs/export',
+    },
+  });
+});
+
 app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
@@ -109,13 +163,35 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
+// Process safety: prevent Node 22 from terminating on unhandled rejections
+process.on('unhandledRejection', (reason: any) => {
+  const message = reason instanceof Error ? reason.message : typeof reason === 'object' ? JSON.stringify(reason) : String(reason);
+  const stack = reason instanceof Error ? reason.stack : undefined;
+  logger.error({ message, stack }, 'Caught unhandled promise rejection (process protected from crash)');
+});
+
+process.on('uncaughtException', (err: Error) => {
+  logger.error({ err: err.message, stack: err.stack }, 'Caught uncaught exception (process protected from crash)');
+});
+
 if (process.env.NODE_ENV !== 'test') {
   const host = process.env.HOST || '0.0.0.0';
   const server = app.listen(env.PORT, host, async () => {
     logger.info(`AI Job Application Automation Server listening on http://${host}:${env.PORT}`);
-    const repo = getRepository();
-    await repo.init();
-    await scheduler.init();
+    try {
+      const repo = getRepository();
+      await repo.init();
+      logger.info('Database repository initialized successfully');
+    } catch (dbErr: any) {
+      logger.error({ err: dbErr?.message || dbErr }, 'Failed initializing database repository');
+    }
+
+    try {
+      await scheduler.init();
+      logger.info('Automation scheduler initialized successfully');
+    } catch (schedErr: any) {
+      logger.warn({ err: schedErr?.message || schedErr }, 'Scheduler initialization failed, background scheduling paused');
+    }
   });
 
   let shuttingDown = false;

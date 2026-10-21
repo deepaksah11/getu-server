@@ -263,40 +263,44 @@ mockPlatformRouter.post('/apply/:id', upload.single('resume'), (req: Request, re
 
 // --- Legacy single-page form (kept for older demo jobs and the generic filler test) ---------
 mockPlatformRouter.get('/job/:id', async (req: Request, res: Response) => {
-  const jobId = req.params.id;
-  const repo = getRepository();
-  const job = (await repo.getJobs({ limit: 1000 })).jobs.find((j) => j.external_id === jobId || j.id === jobId);
-  const title = job ? job.title : 'Software Engineer';
-  const company = job ? job.company : 'Tech Innovations Corp';
-  const isCaptchaDemo = jobId.includes('captcha');
+  try {
+    const jobId = req.params.id;
+    const repo = getRepository();
+    const job = (await repo.getJobs({ limit: 1000 })).jobs.find((j) => j.external_id === jobId || j.id === jobId);
+    const title = job ? job.title : 'Software Engineer';
+    const company = job ? job.company : 'Tech Innovations Corp';
+    const isCaptchaDemo = jobId.includes('captcha');
 
-  res.send(
-    page(
-      `${title} - ${company} Application`,
-      `<h1>${escapeHtml(title)}</h1>
-      <div class="company">${escapeHtml(company)} &bull; Verified Job Application</div>
-      <form id="application-form" method="POST" action="/mock-portal/submit">
-        <input type="hidden" name="jobId" value="${escapeHtml(jobId)}">
-        <div class="form-group"><label for="fullName">Full Name *</label><input type="text" id="fullName" name="fullName" data-testid="applicant-name" placeholder="Your full name" required></div>
-        <div class="form-group"><label for="email">Email Address *</label><input type="email" id="email" name="email" data-testid="applicant-email" placeholder="you@example.com" required></div>
-        <div class="form-group"><label for="phone">Phone Number *</label><input type="tel" id="phone" name="phone" data-testid="applicant-phone" required></div>
-        <div class="form-group"><label for="location">Current Location *</label><input type="text" id="location" name="location" data-testid="applicant-location" required></div>
-        <div class="form-group"><label for="experience">Years of Relevant Experience *</label><input type="text" id="experience" name="experience" data-testid="applicant-experience" required></div>
-        <div class="form-group"><label for="notice">Notice Period *</label><input type="text" id="notice" name="notice" data-testid="applicant-notice" required></div>
-        <div class="form-group"><label for="salary">Salary Expectations *</label><input type="text" id="salary" name="salary" data-testid="applicant-salary" required></div>
-        <div class="form-group"><label for="resume">Upload Resume (PDF/DOCX) *</label><input type="file" id="resume" name="resume" data-testid="resume-upload-input" accept=".pdf,.docx" required></div>
-        <div class="form-group"><label for="summary">Brief Motivation / Summary</label><textarea id="summary" name="summary" rows="3" data-testid="applicant-summary"></textarea></div>
-        ${
-          isCaptchaDemo
-            ? `<div class="captcha-box"><strong>Security Verification Challenge</strong>
-               <p>Please complete the security challenge below to verify you are human.</p>
-               <div class="g-recaptcha" data-sitekey="demo"><iframe src="https://www.google.com/recaptcha/api2/anchor?k=mock-key" width="304" height="78" role="presentation" frameborder="0"></iframe></div></div>`
-            : ''
-        }
-        <div style="margin-top: 24px;"><button type="submit" class="btn-submit" data-testid="submit-application">Submit Application</button></div>
-      </form>`
-    )
-  );
+    res.send(
+      page(
+        `${title} - ${company} Application`,
+        `<h1>${escapeHtml(title)}</h1>
+        <div class="company">${escapeHtml(company)} &bull; Verified Job Application</div>
+        <form id="application-form" method="POST" action="/mock-portal/submit">
+          <input type="hidden" name="jobId" value="${escapeHtml(jobId)}">
+          <div class="form-group"><label for="fullName">Full Name *</label><input type="text" id="fullName" name="fullName" data-testid="applicant-name" placeholder="Your full name" required></div>
+          <div class="form-group"><label for="email">Email Address *</label><input type="email" id="email" name="email" data-testid="applicant-email" placeholder="you@example.com" required></div>
+          <div class="form-group"><label for="phone">Phone Number *</label><input type="tel" id="phone" name="phone" data-testid="applicant-phone" required></div>
+          <div class="form-group"><label for="location">Current Location *</label><input type="text" id="location" name="location" data-testid="applicant-location" required></div>
+          <div class="form-group"><label for="experience">Years of Relevant Experience *</label><input type="text" id="experience" name="experience" data-testid="applicant-experience" required></div>
+          <div class="form-group"><label for="notice">Notice Period *</label><input type="text" id="notice" name="notice" data-testid="applicant-notice" required></div>
+          <div class="form-group"><label for="salary">Salary Expectations *</label><input type="text" id="salary" name="salary" data-testid="applicant-salary" required></div>
+          <div class="form-group"><label for="resume">Upload Resume (PDF/DOCX) *</label><input type="file" id="resume" name="resume" data-testid="resume-upload-input" accept=".pdf,.docx" required></div>
+          <div class="form-group"><label for="summary">Brief Motivation / Summary</label><textarea id="summary" name="summary" rows="3" data-testid="applicant-summary"></textarea></div>
+          ${
+            isCaptchaDemo
+              ? `<div class="captcha-box"><strong>Security Verification Challenge</strong>
+                 <p>Please complete the security challenge below to verify you are human.</p>
+                 <div class="g-recaptcha" data-sitekey="demo"><iframe src="https://www.google.com/recaptcha/api2/anchor?k=mock-key" width="304" height="78" role="presentation" frameborder="0"></iframe></div></div>`
+              : ''
+          }
+          <div style="margin-top: 24px;"><button type="submit" class="btn-submit" data-testid="submit-application">Submit Application</button></div>
+        </form>`
+      )
+    );
+  } catch (err: any) {
+    res.status(500).send(page('Error', `<h1>Unable to load job</h1><p>${escapeHtml(err?.message || 'Error')}</p>`));
+  }
 });
 
 mockPlatformRouter.post('/submit', (_req: Request, res: Response) => {

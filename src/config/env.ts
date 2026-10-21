@@ -37,7 +37,15 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 
   // Storage Adapter
-  STORAGE_MODE: z.enum(['auto', 'supabase', 'file']).default('auto'),
+  STORAGE_MODE: z
+    .string()
+    .optional()
+    .transform((val) => {
+      const mode = (val || process.env.DATA_STORE || 'auto').trim().toLowerCase();
+      if (mode === 'file' || mode === 'local') return 'file' as const;
+      if (mode === 'supabase' || mode === 'postgres') return 'supabase' as const;
+      return 'auto' as const;
+    }),
   // Directory for the local database, generated resumes, screenshots and browser sessions
   DATA_DIR: z.string().optional(),
   // Seeds the demo job board (local mock portal jobs) into a fresh database

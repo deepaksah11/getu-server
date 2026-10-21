@@ -12,17 +12,25 @@ export class Scheduler {
   private ticking = false;
 
   public async init(): Promise<void> {
-    const repo = getRepository();
-    const recovered = await repo.recoverInterrupted();
-    if (recovered.runs || recovered.applications) {
-      logger.warn(recovered, 'Recovered runs/applications interrupted by the last shutdown');
+    try {
+      const repo = getRepository();
+      const recovered = await repo.recoverInterrupted();
+      if (recovered.runs || recovered.applications) {
+        logger.warn(recovered, 'Recovered runs/applications interrupted by the last shutdown');
+      }
+    } catch (err: any) {
+      logger.warn({ err: err?.message || err }, 'Could not recover interrupted runs on startup; continuing');
     }
     this.startTimer();
   }
 
   private startTimer(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => void this.tick(), env.SCHEDULER_TICK_MS);
+    this.timer = setInterval(() => {
+      this.tick().catch((err: any) => {
+        logger.warn({ err: err?.message || err }, 'Automation scheduler tick encountered an error');
+      });
+    }, env.SCHEDULER_TICK_MS);
     this.timer.unref?.();
     logger.info({ tickMs: env.SCHEDULER_TICK_MS }, 'Automation scheduler started');
   }
@@ -42,9 +50,11 @@ export class Scheduler {
           await orchestrator.start(prefs.user_id, { trigger: 'scheduled' });
           logger.info({ userId: prefs.user_id }, 'Scheduled automation run started');
         } catch (err: any) {
-          logger.warn({ userId: prefs.user_id, err: err.message }, 'Scheduled run could not start');
+          logger.warn({ userId: prefs.user_id, err: err?.message || err }, 'Scheduled run could not start');
         }
       }
+    } catch (err: any) {
+      logger.warn({ err: err?.message || err }, 'Scheduler tick error');
     } finally {
       this.ticking = false;
     }
