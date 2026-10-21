@@ -23,35 +23,43 @@ import { mockPlatformRouter } from './routes/mockPlatform.js';
 export const app = express();
 
 // The API can start logins with stored passwords, so only the app's own UI may call it from a browser
+const clientUrls = (env.CLIENT_URL || '')
+  .split(',')
+  .map((u) => u.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
 const allowedOrigins = new Set([
-  env.CLIENT_URL,
+  ...clientUrls,
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:4173',
   'http://127.0.0.1:4173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
 ]);
-function isOriginAllowed(origin: string | undefined): boolean {
-  if (!origin) return true;
-  if (allowedOrigins.has(origin)) return true;
-  try {
-    const hostname = new URL(origin).hostname;
-    if (hostname.endsWith('.onrender.com') || hostname.endsWith('.vercel.app') || hostname === 'localhost' || hostname === '127.0.0.1') {
-      return true;
-    }
-  } catch {}
+
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) return true; // non-browser requests, health checks, curl
+  const clean = origin.trim().replace(/\/+$/, '');
+  if (allowedOrigins.has('*') || allowedOrigins.has(clean)) return true;
+  // Automatically permit *.onrender.com, *.vercel.app, and *.netlify.app for smooth cloud hosting
+  if (clean.endsWith('.onrender.com') || clean.endsWith('.vercel.app') || clean.endsWith('.netlify.app')) {
+    return true;
+  }
   return false;
-}
+};
 
 app.use(
   cors({
     origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
+    credentials: true,
   })
 );
-// CORS only hides responses; "simple" cross-site POSTs would still run, so reject foreign origins outright
+
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
   if (origin && !isOriginAllowed(origin)) {
-    res.status(403).json({ success: false, error: 'Origin not allowed' });
+    res.status(403).json({ success: false, error: `Origin '${origin}' not allowed by CORS. Set CLIENT_URL on Render.` });
     return;
   }
   next();
@@ -102,7 +110,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  const host = process.env.HOST || '127.0.0.1';
+  const host = process.env.HOST || '0.0.0.0';
   const server = app.listen(env.PORT, host, async () => {
     logger.info(`AI Job Application Automation Server listening on http://${host}:${env.PORT}`);
     const repo = getRepository();
