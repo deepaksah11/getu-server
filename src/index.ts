@@ -30,15 +30,27 @@ const allowedOrigins = new Set([
   'http://localhost:4173',
   'http://127.0.0.1:4173',
 ]);
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+  try {
+    const hostname = new URL(origin).hostname;
+    if (hostname.endsWith('.onrender.com') || hostname.endsWith('.vercel.app') || hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 app.use(
   cors({
-    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
+    origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
   })
 );
 // CORS only hides responses; "simple" cross-site POSTs would still run, so reject foreign origins outright
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
-  if (origin && !allowedOrigins.has(origin)) {
+  if (origin && !isOriginAllowed(origin)) {
     res.status(403).json({ success: false, error: 'Origin not allowed' });
     return;
   }
